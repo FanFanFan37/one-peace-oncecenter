@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>one.peace.oncecenter</groupId>
+    <artifactId>one-peace-oncecenter</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <parent>
+        <groupId>com.treefinance.b2b</groupId>
+        <artifactId>treefinance-b2b-parent</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <properties>
+        <maven.test.skip>true</maven.test.skip>
+        <!--这里的版本号，需要和parent的版本号保持一致-->
+        <treefinance.b2b.parent.version>1.0.0-SNAPSHOT</treefinance.b2b.parent.version>
+        <!--依赖于其他工程的版本号，统一在这里定义-->
+        <treefintech.b2b.config.guidcenter.version>0.0.1-SNAPSHOT</treefintech.b2b.config.guidcenter.version>
+    </properties>
+
+    <modules>
+        <module>oncecenter-common-utils</module>
+        <module>oncecenter-common-integration</module>
+        <module>oncecenter-biz-share</module>
+        <module>oncecenter-biz-once</module>
+        <module>oncecenter-common-facade</module>
+        <module>oncecenter-biz-service-impl</module>
+        <module>oncecenter-main</module>
+    </modules>
+
+
+    <!--release的时候使用到-->
+    <scm>
+        <connection>scm:git:http://192.168.5.252/treefinance-b2b-base/treefintech-b2b-democenter.git</connection>
+        <url>http://192.168.5.252/treefinance-b2b-base/treefintech-b2b-democenter</url>
+        <developerConnection>scm:git:http://192.168.5.252/treefinance-b2b-base/treefintech-b2b-democenter.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.5.3</version>
+                <configuration>
+                    <tagNameFormat>v@{project.version}</tagNameFormat>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <!--release的时候，需要将这里的版本号进行升级-->
+                    <releaseVersion>0.0.1</releaseVersion>
+                    <!--release的时候，需要将这里的版本号进行升级-->
+                    <developmentVersion>0.0.2-SNAPSHOT</developmentVersion>
+                    <!--release的时候，需要将这里的版本号进行升级 此版本号=releaseVersion-->
+                    <tag>v0.0.1</tag>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

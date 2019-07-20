@@ -1,0 +1,27 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>one.peace.oncecenter</groupId>
+		<artifactId>one-peace-oncecenter</artifactId>
+		<version>0.0.1-SNAPSHOT</version>
+	</parent>
+	<artifactId>oncecenter-biz-once</artifactId>
+	<name>oncecenter-biz-once</name>
+	<packaging>jar</packaging>
+	<properties>
+		<maven.test.skip>true</maven.test.skip>
+	</properties>
+	<dependencies>
+		<!-- 内部项目依赖 -->
+		<dependency>
+			<groupId>one.peace.oncecenter</groupId>
+			<artifactId>oncecenter-biz-share</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+        <dependency>
+            <groupId>com.treefintech.b2b.config.guidcenter</groupId>
+            <artifactId>config-guidcenter-common-facade</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+	</dependencies>
+</project>

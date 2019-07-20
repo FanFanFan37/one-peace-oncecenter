@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:dubbo="http://code.alibabatech.com/schema/dubbo"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://code.alibabatech.com/schema/dubbo http://code.alibabatech.com/schema/dubbo/dubbo.xsd">
+
+    <!-- 提供方应用名，用于计算依赖关系，不是匹配条件，不要与消费方一样 -->
+    <dubbo:application name="treefintech-b2b-democenter"/>
+<!--    <dubbo:registry address="${dubbo.registry.address}"/>-->
+
+    <!--<dubbo:protocol name="dubbo" port="20111" threadpool="cached"/>-->
+    <dubbo:consumer check="false"/>
+
+    <dubbo:monitor protocol="registry"/>
+    <!--<dubbo:protocol name="dubbo" port="${dubbo-protocol.port}" />-->
+    <!-- 扫描注解包路径，多个包用逗号分隔，不填pacakge表示扫描当前ApplicationContext中所有的类 -->
+    <dubbo:annotation/>
+
+    <import resource="classpath:/spring/treefintech-b2b-oncecenter-common-integration-dubbo.xml"/>
+    <import resource="classpath*:spring/treefintech-b2b-oncecenter-main-dubbo-service.xml"/>
+</beans>
