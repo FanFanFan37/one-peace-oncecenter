@@ -9,7 +9,7 @@
 
 
 
-##--------------------------------------------------------------------------------------------------
+##---AQS阻塞队列以及唤醒线程-----------------------------------------------------------------------------------------------
 https://javadoop.com/post/AbstractQueuedSynchronizer
 
 这里有一个概念: 可重入锁、不可重入锁。
@@ -74,52 +74,52 @@ static final class Node {
 }
 
 
+##--------------------------------------------------------------------------------------------------
+本文关注以下几点内容：
 
+（一）深入理解 ReentrantLock 公平锁和非公平锁的区别
+（二）深入分析 AbstractQueuedSynchronizer 中的 ConditionObject
+（三）深入理解 Java 线程中断和 InterruptedException 异常
+
+
+（一）ReentrantLock 公平锁和非公平锁的区别：
 ReentrantLock 在内部用了内部类 Sync 来管理锁：分为FairSync（公平锁）、NonfairSync（非公平锁）。默认使用 NonfairSync 。
-
 总结：公平锁和非公平锁只有两处不同：
 
 1、非公平锁在调用 lock 后，首先就会调用 CAS 进行一次抢锁，如果这个时候恰巧锁没有被占用，那么直接就获取到锁返回了。
-2、非公平锁在 CAS 失败后，和公平锁一样都会进入到 tryAcquire 方法，在 tryAcquire 方法中，如果发现锁这个时候被释放了（state == 0），非公平锁会直接 CAS 抢锁，但是公平锁会判断等待队列是否有线程处于等待状态，如果有则不去抢锁，乖乖排到后面。
+2、非公平锁在 CAS（CompareAndSetState()） 失败后，和公平锁一样都会进入到 tryAcquire 方法，在 tryAcquire 方法中，如果发现锁这个时候被释放了（state == 0），非公平锁会直接 CAS 抢锁，但是公平锁会判断等待队列是否有线程处于等待状态，如果有则不去抢锁，乖乖排到后面。
 
 公平锁和非公平锁就这两点区别，如果这两次 CAS 都不成功，那么后面非公平锁和公平锁是一样的，都要进入到阻塞队列等待唤醒。
 相对来说，非公平锁会有更好的性能，因为它的吞吐量比较大。当然，非公平锁让获取锁的时间变得更加不确定，可能会导致在阻塞队列中的线程长期处于饥饿状态。
 
 
 
+（一）ConditionObject
+Condition 经常可以用在生产者-消费者的场景中。
+condition 是依赖于 ReentrantLock 的，不管是调用 await 进入等待还是 signal 唤醒，都必须获取到锁才能进行操作。
+
+/**********
+int interruptMode = 0;
+while (!isOnSyncQueue(node)) {
+    // 线程挂起
+    LockSupport.park(this);
+
+    if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
+        break;
+}
+**********/
+中的 interruptMode 可以取值为 REINTERRUPT（1），THROW_IE（-1），0 。
+1、REINTERRUPT（1）： 代表 await 返回的时候，需要重新设置中断状态
+2、THROW_IE（-1）： 代表 await 返回的时候，需要抛出 InterruptedException 异常
+3、0 ：说明在 await 期间，没有发生中断
+
+有以下三种情况会让 LockSupport.park(this); 这句返回继续往下执行：
+
+1、常规路径。signal -> 转移节点到阻塞队列 -> 获取了锁（unpark）
+2、线程中断。在 park 的时候，另外一个线程对这个线程进行了中断
+3、signal 的时候我们说过，转移以后的前驱节点取消了，或者对前驱节点的CAS操作失败了
+4、假唤醒。这个也是存在的，和 Object.wait() 类似，都有这个问题
+
+
 ##--------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
