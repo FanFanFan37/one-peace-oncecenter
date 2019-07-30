@@ -94,7 +94,7 @@ ReentrantLock 在内部用了内部类 Sync 来管理锁：分为FairSync（公�
 
 
 
-（一）ConditionObject
+（二）ConditionObject
 Condition 经常可以用在生产者-消费者的场景中。
 condition 是依赖于 ReentrantLock 的，不管是调用 await 进入等待还是 signal 唤醒，都必须获取到锁才能进行操作。
 
@@ -120,6 +120,10 @@ while (!isOnSyncQueue(node)) {
 3、signal 的时候我们说过，转移以后的前驱节点取消了，或者对前驱节点的CAS操作失败了
 4、假唤醒。这个也是存在的，和 Object.wait() 类似，都有这个问题
 
+
+（三） 线程中断和 InterruptedException 异常
+
+中断：线程发生
 
 ##--------------------------------------------------------------------------------------------------
 

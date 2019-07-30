@@ -2,7 +2,6 @@ package com.treefintech.b2b.oncecenter.common.utils;
 
 import com.alibaba.fastjson.JSONObject;
 import com.treefinance.b2b.common.utils.file.CSVUtils;
-import com.treefinance.tool.test.common.vo.GongFuRepayInstMntDetailNotify;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -54,18 +53,18 @@ public class Test {
 //        System.out.println(JSONObject.toJSONString(peopleList));
 //
 //
-        /**
-         * test
-         */
-
-        try {
-            byte[] fileByteArray = fileConvertToByteArray(new File("/Users/zhang/Downloads/BJZZJF190523001_repay_instmnt_detail_50.txt"));
-            List<GongFuRepayInstMntDetailNotify> recordList = CSVUtils.read(new ByteArrayInputStream(fileByteArray), GongFuRepayInstMntDetailNotify.class);
-            recordList.forEach(o -> System.out.println(JSONObject.toJSONString(o)));
-
-        } catch (Exception e) {
-            System.out.println("error is " + e);
-        }
+//        /**
+//         * test
+//         */
+//
+//        try {
+//            byte[] fileByteArray = fileConvertToByteArray(new File("/Users/zhang/Downloads/BJZZJF190523001_repay_instmnt_detail_50.txt"));
+//            List<GongFuRepayInstMntDetailNotify> recordList = CSVUtils.read(new ByteArrayInputStream(fileByteArray), GongFuRepayInstMntDetailNotify.class);
+//            recordList.forEach(o -> System.out.println(JSONObject.toJSONString(o)));
+//
+//        } catch (Exception e) {
+//            System.out.println("error is " + e);
+//        }
 
 
 
