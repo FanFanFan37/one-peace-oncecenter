@@ -148,8 +148,8 @@ public abstract class AbstractQueuedSynchronizer {
         
         /**
         * interruptMode 可以取值为 REINTERRUPT（1），THROW_IE（-1），0 。
-          1、REINTERRUPT（1）： 代表 await 返回的时候，需要重新设置中断状态
-          2、THROW_IE（-1）： 代表 await 返回的时候，需要抛出 InterruptedException 异常
+          1、如果在 signal 之后中断, REINTERRUPT（1）： 代表 await 返回的时候，需要重新设置中断状态
+          2、如果在 signal 之前已经中断, THROW_IE（-1）： 代表 await 返回的时候，需要抛出 InterruptedException 异常
           3、0 ：说明在 await 期间，没有发生中断
           
           有以下三种情况会让 LockSupport.park(this); 这句返回继续往下执行：
@@ -189,12 +189,35 @@ public abstract class AbstractQueuedSynchronizer {
                 break;
             }
         }
+        
+        /**
+        * 由于 while 出来后，我们确定节点已经进入了阻塞队列，准备获取锁。
+        * 这里的 acquireQueued(node, savedState) 的第一个参数 node 之前已经经过 enq(node) 进入了队列，
+        * 参数 savedState 是之前释放锁前的 state，这个方法返回的时候，代表当前线程获取了锁，而且 state == savedState了。
+        * 
+        * 注意，前面我们说过，不管有没有发生中断，都会进入到阻塞队列，
+        * 而 acquireQueued(node, savedState) 的返回值就是代表线程是否被中断。如果返回 true，说明被中断了，
+        * 而且 interruptMode != THROW_IE，说明在 signal 之前就发生中断了，这里将 interruptMode 设置为 REINTERRUPT，用于待会重新中断。
+        **/
         if (acquireQueued(node, savedState) && interruptMode != THROW_IE) {
             interruptMode = REINTERRUPT;
         }
+        
+        /**
+        * signal 执行完成，node.nextWaiter = null,
+        * 若在 signal 之前中断，只执行了 checkInterruptWhileWaiting 方法中调用 enq(node) 将节点加入到 同步队列，而没有设置 node.nextWaiter = null
+        * 
+        * 这边需要将 waitStatus != Node.CONDITION 的节点移出 条件队列。
+        **/
         if (node.nextWaiter != null) { // clean up if cancelled
             unlinkCancelledWaiters();
         }
+        
+        /**
+        * 0：什么都不做，没有被中断过；
+        * THROW_IE：await 方法抛出 InterruptedException 异常，因为它代表在 await() 期间发生了中断；
+        * REINTERRUPT：重新中断当前线程，因为它代表 await() 期间没有被中断，而是 signal() 以后发生的中断
+        **/
         if (interruptMode != 0) {
             reportInterruptAfterWait(interruptMode);
         }
@@ -409,6 +432,97 @@ public abstract class AbstractQueuedSynchronizer {
 
 
 
+带超时机制的 await :
+超时的思路还是很简单的，不带超时参数的 await 是 park，然后等待别人唤醒。
+而现在就是调用 parkNanos 方法来休眠指定的时间，醒来后判断是否 signal 调用了，调用了就是没有超时，否则就是超时了。超时的话，自己来进行转移到阻塞队列，然后抢锁。
+```java
+public interface Condition {
+    long awaitNanos(long nanosTimeout) throws InterruptedException;
+    boolean await(long time, TimeUnit unit) throws InterruptedException;
+    boolean awaitUntil(Date deadline) throws InterruptedException;
+}
+
+
+
+public abstract class AbstractQueuedSynchronizer {
+    
+    /**
+     * Implements timed condition wait.
+     * <ol>
+     * <li> If current thread is interrupted, throw InterruptedException.
+     * <li> Save lock state returned by {@link #getState}.
+     * <li> Invoke {@link #release} with saved state as argument,
+     *      throwing IllegalMonitorStateException if it fails.
+     * <li> Block until signalled, interrupted, or timed out.
+     * <li> Reacquire by invoking specialized version of
+     *      {@link #acquire} with saved state as argument.
+     * <li> If interrupted while blocked in step 4, throw InterruptedException.
+     * <li> If timed out while blocked in step 4, return false, else true.
+     * </ol>
+     */
+    public final boolean await(long time, TimeUnit unit) throws InterruptedException {
+       /**
+        * 等待时间
+        **/
+        long nanosTimeout = unit.toNanos(time);
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        }
+        Node node = addConditionWaiter();
+        int savedState = fullyRelease(node);
+       /**
+        * 过期时间 = 当前时间 + 等待时间
+        */
+        final long deadline = System.nanoTime() + nanosTimeout;
+       /**
+        * 超时状态
+        **/
+        boolean timedout = false;
+        int interruptMode = 0;
+        while (!isOnSyncQueue(node)) {
+           
+            if (nanosTimeout <= 0L) {
+               /**
+                * 这里因为要 break 取消等待了。取消等待的话一定要调用 transferAfterCancelledWait(node) 这个方法
+                * 如果这个方法返回 true，在这个方法内，将节点转移到阻塞队列成功
+                * 返回 false 的话，说明 signal 已经发生，signal 方法将节点转移了。也就是说没有超时嘛
+                **/
+                timedout = transferAfterCancelledWait(node);
+                break;
+            }
+            
+           /**
+            * spinForTimeoutThreshold 的值是 1000 纳秒，也就是 1 毫秒
+            * 也就是说，如果不到 1 毫秒了，那就不要选择 parkNanos 了，自旋的性能反而更好
+            **/
+            if (nanosTimeout >= spinForTimeoutThreshold) {
+                LockSupport.parkNanos(this, nanosTimeout);
+            }
+            if ((interruptMode = checkInterruptWhileWaiting(node)) != 0) {
+                break;
+            }
+            
+           /**
+            * 得到剩余时间
+            **/
+            nanosTimeout = deadline - System.nanoTime();
+        }
+        if (acquireQueued(node, savedState) && interruptMode != THROW_IE) {
+            interruptMode = REINTERRUPT;
+        }
+        if (node.nextWaiter != null) {
+            unlinkCancelledWaiters();
+        }
+        if (interruptMode != 0) {
+            reportInterruptAfterWait(interruptMode);
+        }
+        return !timedout;
+    }
+}
+```
+
+``
+AbstractQueuedSynchronizer 独占锁的取消排队:
 
 
 
