@@ -84,6 +84,11 @@ public class ConditionProductConsumeTest {
         });
 
         executorService.execute(() -> {
+            try {
+                Thread.sleep(2000L);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             while (true) {
                 try {
                     take();

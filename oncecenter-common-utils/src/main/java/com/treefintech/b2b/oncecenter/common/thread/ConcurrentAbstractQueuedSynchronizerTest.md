@@ -113,7 +113,7 @@ Condition 处理流程：
 4、调用 condition.signal() 用于唤醒条件队列中的firstWaiter，将firstWaiter放入在同步队列的尾节点，等待获取锁。
 
 
-condition.await() 方法详解，将线程放入到条件队列中。
+(二.1.await())condition.await() 方法详解，将线程放入到条件队列中。
 ```java
 /**
  * await()方法是可以被中断的，不可被中断的方法是 awaitUninterruptibly()
@@ -145,6 +145,20 @@ public abstract class AbstractQueuedSynchronizer {
         * 进入到异常分支，然后进入 finally 块设置 node.waitStatus = Node.CANCELLED，这个已经入队的节点之后会被后继的节点”请出去“。
         **/
         int savedState = fullyRelease(node);
+        
+        /**
+        * interruptMode 可以取值为 REINTERRUPT（1），THROW_IE（-1），0 。
+          1、REINTERRUPT（1）： 代表 await 返回的时候，需要重新设置中断状态
+          2、THROW_IE（-1）： 代表 await 返回的时候，需要抛出 InterruptedException 异常
+          3、0 ：说明在 await 期间，没有发生中断
+          
+          有以下三种情况会让 LockSupport.park(this); 这句返回继续往下执行：
+          
+          1、常规路径。signal -> 转移节点到阻塞队列 -> 获取了锁（unpark）
+          2、线程中断。在 park 的时候，另外一个线程对这个线程进行了中断
+          3、signal 的时候我们说过，转移以后的前驱节点取消了，或者对前驱节点的CAS操作失败了
+          4、假唤醒。这个也是存在的，和 Object.wait() 类似，都有这个问题
+        **/
         int interruptMode = 0;
        /**
         * 这里退出循环有两种情况，之后再仔细分析
@@ -164,7 +178,12 @@ public abstract class AbstractQueuedSynchronizer {
             * 上一步 LockSupport.park(this) 线程已经被挂起，下面代码不再执行
             * 等待线程 LockSupport.unpark(); 也就是使用 signal 唤醒线程，转移到同步队列
             **/
+           
             
+           /**
+            * 根据 condition.signal() 方法，将条件队列中的节点转移到同步队列中。
+            * 只要同步队列中的节点获取到锁，即可执行一下代码。
+            **/
            
             if ((interruptMode = checkInterruptWhileWaiting(node)) != 0) {
                 break;
@@ -226,22 +245,173 @@ public abstract class AbstractQueuedSynchronizer {
 ```
 
 
+检查中断状态
+```java
+public abstract class AbstractQueuedSynchronizer {
+    /**
+     * Checks for interrupt, returning THROW_IE if interrupted
+     * before signalled, REINTERRUPT if after signalled, or
+     * 0 if not interrupted.
+     */
+    /**
+     * 1. 如果在 signal 之前已经中断，返回 THROW_IE，代表 await 返回的时候，需要抛出 InterruptedException 异常
+     * 2. 如果是 signal 之后中断，返回 REINTERRUPT，代表 await 返回的时候，需要重新设置中断状态
+     * 3. 没有发生中断，返回 0
+     **/
+    private int checkInterruptWhileWaiting(Node node) {
+        return Thread.interrupted() ? (transferAfterCancelledWait(node) ? THROW_IE : REINTERRUPT) : 0;
+    }
+    
+    
+    /**
+     * Transfers node, if necessary, to sync queue after a cancelled wait.
+     * Returns true if thread was cancelled before being signalled.
+     *
+     * @param node the node
+     * @return true if cancelled before the node was signalled
+     */
+    /**
+     * 只有线程处于中断状态，才会调用此方法
+     * 如果需要的话，将这个已经取消等待的节点转移到阻塞队列
+     * 返回 true：如果此线程在 signal 之前被取消，
+     **/
+    final boolean transferAfterCancelledWait(Node node) {
+        /**
+        * 用 CAS 将节点状态从 Node.CONDITION 设置为 0 
+        * 如果这步 CAS 成功，说明是 signal 方法之前发生的中断，
+        * 因为 signal 之前节点是在条件队列中，waitStatus = Node.CONDITION, 
+        * 并且 signal 先发生的话，signal 中会将 waitStatus 设置为 0 
+        **/
+        if (compareAndSetWaitStatus(node, Node.CONDITION, 0)) {
+            /**
+            * CAS成功，说明在signal方法之前发生中断，需要执行自旋操作（ signal 中也用到类似的操作），将节点从条件队列--->同步队列
+            **/
+            enq(node);
+            return true;
+        }
+        /*
+         * If we lost out to a signal(), then we can't proceed
+         * until it finishes its enq().  Cancelling during an
+         * incomplete transfer is both rare and transient, so just
+         * spin.
+         */
+        /**
+        * 到这里是因为 CAS 失败，肯定是因为 signal 方法已经将 waitStatus 设置为了 0
+        * signal 方法会将节点转移到阻塞队列，但是可能还没完成，这边自旋等待其完成
+        * 当然，这种事情还是比较少的吧：signal 调用之后，没完成转移之前，发生了中断
+        **/
+        while (!isOnSyncQueue(node)) {
+            /**
+            * yield 即 “谦让”，也是 Thread 类的方法。
+            * 它让掉当前线程 CPU 的时间片，使正在运行中的线程重新变成就绪状态，
+            * 并重新竞争 CPU 的调度权。它可能会获取到，也有可能被其他线程获取到。
+            * 
+            * 使得 signal 的线程执行完成，将节点转移到同步队列中。
+            **/
+            Thread.yield();
+        }
+        return false;
+    }
+}
+```
+
+
+
+(二.2.signal())signal() 唤醒等待最久的线程，转移到同步队列。
+等待同步队列中的节点获取到锁，即可执行 await()方法中的下半段。
+```java
+public abstract class AbstractQueuedSynchronizer {
+    /**
+    * 让条件队列中的节点，进入到同步队列。
+    * 等待同步队列中的节点获取到锁，即可执行 await()方法中的下半段。
+    **/
+    public final void signal() {
+        /**
+        * isHeldExclusively() 判断当前线程是否拥有独占锁。
+        **/
+        if (!isHeldExclusively()) {
+            throw new IllegalMonitorStateException();
+        }
+        /**
+        * 唤醒条件队列的头结点
+        **/
+        Node first = firstWaiter;
+        if (first != null) {
+            doSignal(first);
+        }
+    }    
+    
+    /**
+    * 条件队列从前往后遍历，找出第一个需要转移的节点。
+    * 因为有些线程已经取消排队，但是有可能还在条件队列中。
+    **/
+    private void doSignal(Node first) {
+        do {
+            /**
+            * 因为 firstwaiter 需要转移到同步队列中，所以要将 firstwaiter 指向当前firstwaiter的下一个节点。
+            * 若firstwaiter的下一个节点为null, 则需要将lastWaiter置为null
+            **/
+            if ( (firstWaiter = first.nextWaiter) == null) {
+                lastWaiter = null;
+            }
+            /**
+            * 因为first节点需要转移到同步队列，所以需要与条件队列断绝关系。
+            **/
+            first.nextWaiter = null;
+        } while (!transferForSignal(first) && (first = firstWaiter) != null);
+    }
+    
+    /**
+    * 将first节点放入到同步队列中。
+    **/
+    final boolean transferForSignal(Node node) {
+        /*
+         * If cannot change waitStatus, the node has been cancelled.
+         */
+        /**
+        * CAS操作，将node.state 从 Node.CONDITION 设置为 0
+        * 若CAS失败，则表示node.state != Node.CONDITION，说明该节点已经被取消。
+        **/
+        if (!compareAndSetWaitStatus(node, Node.CONDITION, 0)) {
+            return false;
+        }
+        /*
+         * Splice onto queue and try to set waitStatus of predecessor to
+         * indicate that thread is (probably) waiting. If cancelled or
+         * attempt to set waitStatus fails, wake up to resync (in which
+         * case the waitStatus can be transiently and harmlessly wrong).
+         */
+        /**
+        * 使用自旋方式，将node 加入到同步队列中
+        * Node p = enq(node); 返回的 p 表示之前的同步队列尾节点tail。
+        **/
+        Node p = enq(node);
+        int ws = p.waitStatus;
+        /**
+        * p.waitStatus > 0 表示 p.waitStatus = 1 (CANCELLED) ,node的前置节点取消争抢锁，所以直接将node节点唤醒。
+        * compareAndSetWaitStatus(p, ws, Node.SIGNAL) = false, node的前置节点CAS失败，直接将node节点唤醒，原因看下一节。
+        * 
+        * 
+        * 正常情况下，ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL) 这句中，
+        * ws <= 0，而且 compareAndSetWaitStatus(p, ws, Node.SIGNAL) 会返回 true，
+        * 所以一般也不会进去 if 语句块中唤醒 node 对应的线程。然后这个方法返回 true，也就意味着 signal 方法结束了，节点进入了阻塞队列。
+        **/
+        if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL)) {
+            /**
+            * 唤醒线程
+            **/
+            LockSupport.unpark(node.thread);
+        }
+         return true;
+    }
+}
+```
 
 
 
 
 
-interruptMode 可以取值为 REINTERRUPT（1），THROW_IE（-1），0 。
-1、REINTERRUPT（1）： 代表 await 返回的时候，需要重新设置中断状态
-2、THROW_IE（-1）： 代表 await 返回的时候，需要抛出 InterruptedException 异常
-3、0 ：说明在 await 期间，没有发生中断
 
-有以下三种情况会让 LockSupport.park(this); 这句返回继续往下执行：
-
-1、常规路径。signal -> 转移节点到阻塞队列 -> 获取了锁（unpark）
-2、线程中断。在 park 的时候，另外一个线程对这个线程进行了中断
-3、signal 的时候我们说过，转移以后的前驱节点取消了，或者对前驱节点的CAS操作失败了
-4、假唤醒。这个也是存在的，和 Object.wait() 类似，都有这个问题
 
 
 （三） 线程中断和 InterruptedException 异常
