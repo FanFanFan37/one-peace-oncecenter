@@ -22,10 +22,10 @@ public class ConditionProductConsumeTest {
     static final Condition notEmpty = lock.newCondition();
 
     static final Object[] items = new Object[100];
-    static int putptr, takeptr, count;
-    static int number;
+    private static int putptr, takeptr, count;
+    private static int number;
 
-    public static void put(Object object) throws InterruptedException {
+    private static void put(Object object) throws InterruptedException {
         lock.lock();
 
         try{
@@ -44,7 +44,7 @@ public class ConditionProductConsumeTest {
         }
     }
 
-    public static Object take() throws InterruptedException {
+    private static Object take() throws InterruptedException {
         lock.lock();
         try {
             while (count == 0) {
@@ -93,6 +93,5 @@ public class ConditionProductConsumeTest {
                 }
             }
         });
-
     }
 }
