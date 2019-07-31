@@ -232,7 +232,14 @@ static final class FairSync extends Sync {
                 }
                 // 到这里，说明上面的if分支没有成功，要么当前node本来就不是队头，
                 // 要么就是tryAcquire(arg)没有抢赢别人，继续往下看
+               /**
+                * 节点是的waitStatus 是由后继节点设置的，由于node是新增加的节点，不存在后继节点，所以 这个方法通常情况下返回false.
+                **/
                 if (shouldParkAfterFailedAcquire(p, node) &&
+                    
+                   /**
+                    * 这一步线程会被挂起，等待 unlock - release 中的方法唤起线程。
+                    **/
                     parkAndCheckInterrupt())
                     interrupted = true;
             }
@@ -319,7 +326,14 @@ static final class FairSync extends Sync {
     * 能执行到这里，就说明 shouldParkAfterFailedAcquire() 方法有问题，需要中断挂起。
     **/
     private final boolean parkAndCheckInterrupt() {
+       /**
+        * 挂起线程
+        */
         LockSupport.park(this);
+        
+       /**
+        * 等待 LockSupport.unpark(); 唤起线程
+        **/
         return Thread.interrupted();
     }
 
@@ -336,85 +350,88 @@ static final class FairSync extends Sync {
 解锁操作：
 ```java
 public abstract class AbstractQueuedSynchronizer {
-// 唤醒的代码还是比较简单的，你如果上面加锁的都看懂了，下面都不需要看就知道怎么回事了
-public void unlock() {
-    sync.release(1);
-}
-
-public final boolean release(int arg) {
-    // 往后看吧
-    if (tryRelease(arg)) {
-        Node h = head;
-        if (h != null && h.waitStatus != 0)
-            unparkSuccessor(h);
-        return true;
+    // 唤醒的代码还是比较简单的，你如果上面加锁的都看懂了，下面都不需要看就知道怎么回事了
+    public void unlock() {
+        sync.release(1);
     }
-    return false;
-}
-
-// 回到ReentrantLock看tryRelease方法
-protected final boolean tryRelease(int releases) {
-    int c = getState() - releases;
-    if (Thread.currentThread() != getExclusiveOwnerThread())
-        throw new IllegalMonitorStateException();
-    // 是否完全释放锁
-    boolean free = false;
-    // 其实就是重入的问题，如果c==0，也就是说没有嵌套锁了，可以释放了，否则还不能释放掉
-    if (c == 0) {
-        free = true;
-        setExclusiveOwnerThread(null);
+    
+    public final boolean release(int arg) {
+        // 往后看吧
+        if (tryRelease(arg)) {
+            Node h = head;
+            if (h != null && h.waitStatus != 0)
+                unparkSuccessor(h);
+            return true;
+        }
+        return false;
     }
-    setState(c);
-    return free;
-}
-
-/**
- * Wakes up node's successor, if one exists.
- *
- * @param node the node
- */
-// 唤醒后继节点
-// 从上面调用处知道，参数node是head头结点
-private void unparkSuccessor(Node node) {
-    /*
-     * If status is negative (i.e., possibly needing signal) try
-     * to clear in anticipation of signalling.  It is OK if this
-     * fails or if status is changed by waiting thread.
+    
+    // 回到ReentrantLock看tryRelease方法
+    protected final boolean tryRelease(int releases) {
+        int c = getState() - releases;
+        if (Thread.currentThread() != getExclusiveOwnerThread())
+            throw new IllegalMonitorStateException();
+        // 是否完全释放锁
+        boolean free = false;
+        // 其实就是重入的问题，如果c==0，也就是说没有嵌套锁了，可以释放了，否则还不能释放掉
+        if (c == 0) {
+            free = true;
+            setExclusiveOwnerThread(null);
+        }
+        setState(c);
+        return free;
+    }
+    
+    /**
+     * Wakes up node's successor, if one exists.
+     *
+     * @param node the node
      */
-    int ws = node.waitStatus;
-    // 如果head节点当前waitStatus<0, 将其修改为0
-    if (ws < 0)
-        compareAndSetWaitStatus(node, ws, 0);
-    /*
-     * Thread to unpark is held in successor, which is normally
-     * just the next node.  But if cancelled or apparently null,
-     * traverse backwards from tail to find the actual
-     * non-cancelled successor.
-     */
-    // 下面的代码就是唤醒后继节点，但是有可能后继节点取消了等待（waitStatus==1）
-    // 从队尾往前找，找到waitStatus<=0的所有节点中排在最前面的
-    Node s = node.next;
-    if (s == null || s.waitStatus > 0) {
-        s = null;
-        // 从后往前找，仔细看代码，不必担心中间有节点取消(waitStatus==1)的情况
-        for (Node t = tail; t != null && t != node; t = t.prev)
-            if (t.waitStatus <= 0)
-                s = t;
+    // 唤醒后继节点
+    // 从上面调用处知道，参数node是head头结点
+    private void unparkSuccessor(Node node) {
+        /*
+         * If status is negative (i.e., possibly needing signal) try
+         * to clear in anticipation of signalling.  It is OK if this
+         * fails or if status is changed by waiting thread.
+         */
+        int ws = node.waitStatus;
+        // 如果head节点当前waitStatus<0, 将其修改为0
+        if (ws < 0)
+            compareAndSetWaitStatus(node, ws, 0);
+        /*
+         * Thread to unpark is held in successor, which is normally
+         * just the next node.  But if cancelled or apparently null,
+         * traverse backwards from tail to find the actual
+         * non-cancelled successor.
+         */
+        // 下面的代码就是唤醒后继节点，但是有可能后继节点取消了等待（waitStatus==1）
+        // 从队尾往前找，找到waitStatus<=0的所有节点中排在最前面的
+        Node s = node.next;
+        if (s == null || s.waitStatus > 0) {
+            s = null;
+            // 从后往前找，仔细看代码，不必担心中间有节点取消(waitStatus==1)的情况
+            for (Node t = tail; t != null && t != node; t = t.prev)
+                if (t.waitStatus <= 0)
+                    s = t;
+        }
+        if (s != null)
+            // 唤醒线程
+            LockSupport.unpark(s.thread);
     }
-    if (s != null)
-        // 唤醒线程
-        LockSupport.unpark(s.thread);
-}
-
-//唤醒线程以后，被唤醒的线程将从以下代码中继续往前走：
-  
-
-private final boolean parkAndCheckInterrupt() {
-    LockSupport.park(this); // 刚刚线程被挂起在这里了
-    return Thread.interrupted();
-}
-// 又回到这个方法了：acquireQueued(final Node node, int arg)，这个时候，node的前驱是head了
-
+    
+    //唤醒线程以后，被唤醒的线程将从以下代码中继续往前走：
+      
+    
+    private final boolean parkAndCheckInterrupt() {
+        LockSupport.park(this); // 刚刚线程被挂起在这里了
+        
+       /**
+        * 线程被唤醒，从这个地方往下走。
+        * 又回到这个方法了：acquireQueued(final Node node, int arg)，这个时候，node的前驱是head了
+        **/
+        return Thread.interrupted();
+    }
 }
 ```
 
@@ -461,7 +478,7 @@ Condition 处理流程：
 4、调用 condition.signal() 用于唤醒条件队列中的firstWaiter，将firstWaiter放入在同步队列的尾节点，等待获取锁。
 
 
-(二.1.await())condition.await() 方法详解，将线程放入到条件队列中。
+(二.1.await()) condition.await() 方法详解，将线程放入到条件队列中。
 ```java
 /**
  * await()方法是可以被中断的，不可被中断的方法是 awaitUninterruptibly()
@@ -870,9 +887,6 @@ public abstract class AbstractQueuedSynchronizer {
 ```
 
 
-AbstractQueuedSynchronizer 独占锁的取消排队:
-
-
 
 
 
@@ -881,5 +895,293 @@ AbstractQueuedSynchronizer 独占锁的取消排队:
 中断：程序在执行过程中，发生了某些非正常事件指示当前进程不能继续执行，应得到暂停或者终止，从而通知正在执行的进程暂停执行的操作。
 中断是实现并发的基础，中断一个线程的执行，调度另一个线程执行。
 
-##--------------------------------------------------------------------------------------------------
+
+线程中断方法：
+```java
+public class Thread implements Runnable { 
+   
+   // Thread 类中的实例方法，持有线程实例引用即可检测线程中断状态
+   public boolean isInterrupted() {
+       return isInterrupted(false);
+   }
+   
+   // Thread 中的静态方法，检测调用这个方法的线程是否已经中断
+   // 注意：这个方法返回中断状态的同时，会将此线程的中断状态重置为 false
+   // 所以，如果我们连续调用两次这个方法的话，第二次的返回值肯定就是 false 了
+   public static boolean interrupted() {
+       return currentThread().isInterrupted(true);
+   }
+   
+   // Thread 类中的实例方法，用于设置一个线程的中断状态为 true
+   public void interrupt() {
+        if (this != Thread.currentThread()) {
+            checkAccess();
+        }
+        synchronized (blockerLock) {
+            Interruptible b = blocker;
+            if (b != null) {
+                interrupt0();           // Just to set the interrupt flag
+                b.interrupt(this);
+                return;
+            }
+        }
+        interrupt0();
+   }
+}
+```
+
+
+
+
+##---AQS 共享模式的使用-----------------------------------------------------------------------------------------------
+
+
+(一)CountDownLatch 将共享模式说清楚。
+(二)CyclicBarrier
+(三)Semaphore
+
+CountDownLatch 构造方法
+```java
+public class CountDownLatch {
+    
+    /**
+    * Constructs a {@code CountDownLatch} initialized with the given count.
+    *
+    * @param count the number of times {@link #countDown} must be invoked
+    *        before threads can pass through {@link #await}
+    * @throws IllegalArgumentException if {@code count} is negative
+    */
+    /**
+    * 结合这两个方法：由于AQS中的 state 是整数值，所有调用 downLatch.await() 方法的线程都会挂起。
+    * 每一个任务执行 state -= 1 , 直到将 state 减为 0 的线程负责唤醒所以调用了 await() 方法的线程。
+    * 
+    * 所以对于 CountDownLatch 只需要关注两个方法，downLatch.countDown(); downLatch.await();
+    **/
+    public CountDownLatch(int count) {
+        if (count < 0) {
+            throw new IllegalArgumentException("count < 0");
+        }
+        this.sync = new Sync(count);
+    }   
+}
+
+private static final class Sync extends AbstractQueuedSynchronizer {
+    Sync(int count) {
+        setState(count);
+    }
+}
+```
+
+downLatch.await() 线程阻塞
+
+```java
+public class CountDownLatch {
+    /**
+     * Causes the current thread to wait until the latch has counted down to
+     * zero, unless the thread is {@linkplain Thread#interrupt interrupted}.
+     *
+     * <p>If the current count is zero then this method returns immediately.
+     *
+     * <p>If the current count is greater than zero then the current
+     * thread becomes disabled for thread scheduling purposes and lies
+     * dormant until one of two things happen:
+     * <ul>
+     * <li>The count reaches zero due to invocations of the
+     * {@link #countDown} method; or
+     * <li>Some other thread {@linkplain Thread#interrupt interrupts}
+     * the current thread.
+     * </ul>
+     *
+     * <p>If the current thread:
+     * <ul>
+     * <li>has its interrupted status set on entry to this method; or
+     * <li>is {@linkplain Thread#interrupt interrupted} while waiting,
+     * </ul>
+     * then {@link InterruptedException} is thrown and the current thread's
+     * interrupted status is cleared.
+     *
+     * @throws InterruptedException if the current thread is interrupted
+     *         while waiting
+     */
+    public void await() throws InterruptedException {
+        sync.acquireSharedInterruptibly(1);
+    }
+
+    /**
+     * Acquires in shared mode, aborting if interrupted.  Implemented
+     * by first checking interrupt status, then invoking at least once
+     * {@link #tryAcquireShared}, returning on success.  Otherwise the
+     * thread is queued, possibly repeatedly blocking and unblocking,
+     * invoking {@link #tryAcquireShared} until success or the thread
+     * is interrupted.
+     * @param arg the acquire argument.
+     * This value is conveyed to {@link #tryAcquireShared} but is
+     * otherwise uninterpreted and can represent anything
+     * you like.
+     * @throws InterruptedException if the current thread is interrupted
+     */
+    public final void acquireSharedInterruptibly(int arg)
+            throws InterruptedException {
+        if (Thread.interrupted()) {
+            throw new InterruptedException();
+        }
+        /**
+         * 
+         **/
+        if (tryAcquireShared(arg) < 0) {
+            doAcquireSharedInterruptibly(arg);
+        }
+    }
+    
+    /**
+     * 因为 new CountDownLatch(2) 所以 刚开始的 getState = 2
+     **/
+    protected int tryAcquireShared(int acquires) {
+        return (getState() == 0) ? 1 : -1;
+    }
+    
+    
+    /**
+     * Acquires in shared interruptible mode.
+     * @param arg the acquire argument
+     **/
+    private void doAcquireSharedInterruptibly(int arg)
+        throws InterruptedException {
+        /**
+         * 将 node 加入到 同步队列
+         **/
+        final Node node = addWaiter(Node.SHARED);
+        boolean failed = true;
+        try {
+            for (;;) {
+                final Node p = node.predecessor();
+                if (p == head) {
+                    int r = tryAcquireShared(arg);
+                    if (r >= 0) {
+                        setHeadAndPropagate(node, r);
+                        p.next = null; // help GC
+                        failed = false;
+                        return;
+                    }
+                }
+                if (shouldParkAfterFailedAcquire(p, node) &&
+                    parkAndCheckInterrupt())
+                    throw new InterruptedException();
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+}    
+    
+    
+```
+
+downLatch.countDown() 
+
+```java
+public class CountDownLatch {
+    /**
+     * Decrements the count of the latch, releasing all waiting threads if
+     * the count reaches zero.
+     *
+     * <p>If the current count is greater than zero then it is decremented.
+     * If the new count is zero then all waiting threads are re-enabled for
+     * thread scheduling purposes.
+     *
+     * <p>If the current count equals zero then nothing happens.
+     */
+    public void countDown() {
+        sync.releaseShared(1);
+    }
+    /**
+     * Releases in shared mode.  Implemented by unblocking one or more
+     * threads if {@link #tryReleaseShared} returns true.
+     *
+     * @param arg the release argument.  This value is conveyed to
+     *        {@link #tryReleaseShared} but is otherwise uninterpreted
+     *        and can represent anything you like.
+     * @return the value returned from {@link #tryReleaseShared}
+     */
+    public final boolean releaseShared(int arg) {
+        if (tryReleaseShared(arg)) {
+            doReleaseShared();
+            return true;
+        }
+        return false;
+    }  
+    
+    
+    protected boolean tryReleaseShared(int releases) {
+        // Decrement count; signal when transition to zero
+        for (;;) {
+            int c = getState();
+            if (c == 0) {
+                return false;
+            }
+            int nextc = c-1;
+            if (compareAndSetState(c, nextc)) {
+                return nextc == 0;
+            }
+        }
+    }
+
+
+    /**
+     * Release action for shared mode -- signals successor and ensures
+     * propagation. (Note: For exclusive mode, release just amounts
+     * to calling unparkSuccessor of head if it needs signal.)
+     */
+    private void doReleaseShared() {
+        /*
+         * Ensure that a release propagates, even if there are other
+         * in-progress acquires/releases.  This proceeds in the usual
+         * way of trying to unparkSuccessor of head if it needs
+         * signal. But if it does not, status is set to PROPAGATE to
+         * ensure that upon release, propagation continues.
+         * Additionally, we must loop in case a new node is added
+         * while we are doing this. Also, unlike other uses of
+         * unparkSuccessor, we need to know if CAS to reset status
+         * fails, if so rechecking.
+         */
+        for (;;) {
+            Node h = head;
+            if (h != null && h != tail) {
+                int ws = h.waitStatus;
+                if (ws == Node.SIGNAL) {
+                    if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0)) {
+                        continue;            // loop to recheck cases
+                    }
+                    unparkSuccessor(h);
+                } else if (ws == 0 &&
+                         !compareAndSetWaitStatus(h, 0, Node.PROPAGATE)) {
+                    continue;                // loop on failed CAS
+                }
+            }
+            if (h == head) {                   // loop if head changed
+                break;
+            }
+        }
+    }
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
