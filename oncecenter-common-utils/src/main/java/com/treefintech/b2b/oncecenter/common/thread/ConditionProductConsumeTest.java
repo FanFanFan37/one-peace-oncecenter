@@ -18,10 +18,10 @@ public class ConditionProductConsumeTest {
 
     static final Lock lock = new ReentrantLock();
 
-    static final Condition notFull = lock.newCondition();
-    static final Condition notEmpty = lock.newCondition();
+    static final Condition product = lock.newCondition();
+    static final Condition consume = lock.newCondition();
 
-    static final Object[] items = new Object[100];
+    static final Object[] items = new Object[10];
     private static int putptr, takeptr, count;
     private static int number;
 
@@ -30,7 +30,7 @@ public class ConditionProductConsumeTest {
 
         try{
             while (count == items.length) {
-                notFull.await();
+                product.await();
             }
             items[putptr] = object;
             if (++putptr == items.length) {
@@ -38,7 +38,7 @@ public class ConditionProductConsumeTest {
             }
             ++count;
             System.out.println("put = " + object + ", count = " + count);
-            notEmpty.signal();
+            consume.signal();
         }finally {
             lock.unlock();
         }
@@ -48,7 +48,7 @@ public class ConditionProductConsumeTest {
         lock.lock();
         try {
             while (count == 0) {
-                notEmpty.await();
+                consume.await();
             }
             Object object = items[takeptr];
             if (++takeptr == items.length) {
@@ -56,7 +56,7 @@ public class ConditionProductConsumeTest {
             }
             --count;
             System.out.println("take = " + object + ", count = " + count);
-            notFull.signal();
+            product.signal();
             return object;
         } finally {
             lock.unlock();
