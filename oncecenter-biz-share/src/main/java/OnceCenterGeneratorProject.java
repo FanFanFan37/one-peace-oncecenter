@@ -9,7 +9,7 @@ import java.io.IOException;
  * <p> 工程生成 </p>
  * Created by shiyc on 2018/7/18.
  */
-public class DemoCenterGeneratorProject {
+public class OnceCenterGeneratorProject {
 
     public static void main(String[] args) throws IOException {
         /**

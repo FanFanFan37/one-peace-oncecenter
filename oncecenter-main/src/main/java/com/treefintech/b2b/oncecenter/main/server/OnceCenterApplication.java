@@ -1,4 +1,4 @@
-package com.treefintech.b2b.democenter.main.server;
+package com.treefintech.b2b.oncecenter.main.server;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -16,7 +16,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class OnceCenterApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(DemoCenterApplication.class, args);
+        SpringApplication.run(OnceCenterApplication.class, args);
     }
 
 }

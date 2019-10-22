@@ -4,10 +4,10 @@
             http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd"
        default-lazy-init="false">
 
-    <context:component-scan base-package="com.treefintech.b2b.democenter.biz.service.impl"/>
+    <context:component-scan base-package="com.treefintech.b2b.oncecenter.biz.service.impl"/>
 
-    <context:property-placeholder location="classpath:/config/treefintech-b2b-democenter-biz-service-impl.properties" ignore-unresolvable="true"/>
+    <context:property-placeholder location="classpath:/config/treefintech-b2b-oncecenter-biz-service-impl.properties" ignore-unresolvable="true"/>
 
-    <import resource="classpath:/spring/treefintech-b2b-democenter-biz-demo-spring.xml"/>
-    <import resource="classpath:/spring/treefintech-b2b-democenter-common-integration-spring.xml"/>
+    <import resource="classpath:/spring/treefintech-b2b-oncecenter-biz-once-spring.xml"/>
+    <import resource="classpath:/spring/treefintech-b2b-oncecenter-common-integration-spring.xml"/>
 </beans>

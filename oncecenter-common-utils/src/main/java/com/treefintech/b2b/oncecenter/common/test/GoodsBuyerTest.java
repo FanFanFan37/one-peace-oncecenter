@@ -61,7 +61,7 @@ public class GoodsBuyerTest {
             goodsList.add(new Goods(String.valueOf(i), ""));
         }
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 10000; i++) {
             buyerIdList.add(String.valueOf(i));
         }
     }
@@ -89,8 +89,8 @@ public class GoodsBuyerTest {
         System.out.println("loading date for goodsList = " + JSONObject.toJSONString(goodsList) + ", buyIdList = " + JSONObject.toJSONString(buyerIdList));
 
         //创建线程池，模拟并发
-        ExecutorService executorService = new ThreadPoolExecutor(10, 20, 5000L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1000), (ThreadFactory) Thread::new);
-        //抢购完毕，立即返回结果，不管其他没抢到的线程
+        ExecutorService executorService = new ThreadPoolExecutor(10, 20, 5000L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(10000), (ThreadFactory) Thread::new);
+        //抢购完毕，主线程立即返回结果，不管其他没抢到的线程
         Integer buyFinishCount = NumberUtils.lessThan(goodsList.size(), buyerIdList.size()) ? goodsList.size() : buyerIdList.size();
         CountDownLatch downLatch = new CountDownLatch(buyFinishCount);
         //保证所有线程同时启动

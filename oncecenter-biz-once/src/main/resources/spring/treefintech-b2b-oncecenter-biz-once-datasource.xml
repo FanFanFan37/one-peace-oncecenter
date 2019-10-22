@@ -6,13 +6,13 @@
 
 	<bean id="demoCenterDataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
 		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
-		<property name="url" value="${democenter_db_url}" />
-		<property name="username" value="${democenter_db_username}" />
-		<property name="password" value="${democenter_db_password}" />
-		<property name="initialSize" value="${democenter_db_initialSize}" />
-		<property name="maxActive" value="${democenter_db_maxActive}" />
-		<property name="maxIdle" value="${democenter_db_maxIdle}" />
-		<property name="minIdle" value="${democenter_db_minIdle}" />
+		<property name="url" value="jdbc:mysql://192.168.5.241:3306/loandb?zeroDateTimeBehavior=convertToNull" />
+		<property name="username" value="root" />
+		<property name="password" value="dashu0701" />
+		<property name="initialSize" value="10" />
+		<property name="maxActive" value="20" />
+		<property name="maxIdle" value="10" />
+		<property name="minIdle" value="10" />
 		<property name="maxWait" value="600000" />
 		<!-- 一个查询10分钟内没有返回，自动放弃 -->
 		<property name="validationQuery" value="SELECT 1" />
@@ -28,10 +28,10 @@
 			value="3" /> <property name="minEvictableIdleTimeMillis" value="320000" /> -->
 	</bean>
 
-	<bean id="demoCenterSqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean" name="demoCenterSqlSessionFactory">
-		<property name="dataSource" ref="demoCenterDataSource" />
-		<property name="mapperLocations" value="classpath:sqlmap-demo/*.xml" />
-	</bean>
+	<!--<bean id="demoCenterSqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean" name="demoCenterSqlSessionFactory">-->
+		<!--<property name="dataSource" ref="demoCenterDataSource" />-->
+		<!--<property name="mapperLocations" value="classpath:sqlmap-once/*.xml" />-->
+	<!--</bean>-->
 	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
 		<property name="basePackage" value="com.treefintech.b2b.democenter.biz.demo.mapper" />
 		<property name="sqlSessionFactoryBeanName" value="demoCenterSqlSessionFactory" />
